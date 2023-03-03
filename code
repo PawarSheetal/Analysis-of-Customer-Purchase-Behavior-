@@ -1,0 +1,52 @@
+# Python code to clean and transform the dataset
+import pandas as pd
+
+# Read the dataset
+df = pd.read_csv('customer_transactions.csv')
+
+# Remove duplicates
+df.drop_duplicates(inplace=True)
+
+# Handle missing values
+df.dropna(inplace=True)
+
+# Convert data types
+df['purchase_date'] = pd.to_datetime(df['purchase_date'])
+# Hadoop command to load data into HDFS
+hadoop fs -put customer_transactions.csv /user/hadoop/customer_transactions.csv
+# Python code to define Map and Reduce functions
+def mapper(record):
+    customer_id, product_id, purchase_date, purchase_amount = record.split(',')
+    yield customer_id, float(purchase_amount)
+
+def reducer(customer_id, purchase_amounts):
+    total_purchases = sum(purchase_amounts)
+    yield customer_id, total_purchases
+    
+# Hadoop command to run MapReduce job
+hadoop jar hadoop-streaming.jar \
+-file mapper.py -mapper 'python mapper.py' \
+-file reducer.py -reducer 'python reducer.py' \
+-input /user/hadoop/customer_transactions.csv \
+-output /user/hadoop/customer_purchases
+# Python code to visualize customer purchase behavior
+import matplotlib.pyplot as plt
+import pyodbc
+
+# Connect to SQL database
+conn = pyodbc.connect('Driver={SQL Server};'
+                      'Server=server_name;'
+                      'Database=db_name;'
+                      'Trusted_Connection=yes;')
+
+# Query data
+cursor = conn.cursor()
+cursor.execute('SELECT customer_id, total_purchases FROM customer_purchases')
+
+# Create a bar chart of total purchases by customer
+data = cursor.fetchall()
+df = pd.DataFrame(data, columns=['customer_id', 'total_purchases'])
+plt.bar(df['customer_id'], df['total_purchases'])
+plt.xlabel('Customer ID')
+plt.ylabel('Total Purchases')
+plt.show()
